@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Smart PPT Viewer</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/assets/bootstrap/css/bootstrap.min.css">
+    <script src="/assets/jquery/jquery.min.js"></script>
+    <script src="/assets/bootstrap/js/bootstrap.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+
+</head>
+
+<body>
+        <p hidden id="p0"></p>
+        <p hidden id="p1"></p>
+        <p hidden id="p2"></p>
+    <div class="container">
+        <nav class="navbar navbar-expand-sm bg-dark navbar-dark">
+
+            <ul class="navbar-nav">
+                <li class="nav-item active">
+                    <a class="nav-link" href="#">Smart PPT Viewer - Demo</a>
+                </li>                
+            </ul>
+        </nav>
+        <div class="mx-auto" style="height: 30px;">
+              
+        </div>
+              
+        <div class="row">
+            <div class="col-sm-2">
+                   <ul id="users" class="list-group">
+                   </ul>
+            </div>
+            <div  class="col-sm-10">
+                <div id="pptViewer" class="carousel slide" data-ride="carousel" data-interval="false">
+                    <ol class="carousel-indicators">
+                      <li data-target="#pptViewer" data-slide-to="0" class="active"></li>
+                      <li data-target="#pptViewer" data-slide-to="1"></li>
+                      <li data-target="#pptViewer" data-slide-to="2"></li>
+                    </ol>
+                    
+                    <div class="carousel-inner" role="listbox">
+                      <div class="carousel-item active">
+                        <img class="d-block img-fluid" src="http://via.placeholder.com/1200x600" alt="First slide">
+                      </div>
+                      <div class="carousel-item">
+                        <img class="d-block img-fluid" src="http://via.placeholder.com/1200x600" alt="Second slide">
+                      </div>
+                      <div class="carousel-item">
+                        <img class="d-block img-fluid" src="http://via.placeholder.com/1200x600" alt="Third slide">
+                      </div>
+                    </div>
+                    <a class="carousel-control-prev" href="#pptViewer" role="button" data-slide="prev">
+                      <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                      <span class="sr-only">Previous</span>
+                    </a>
+                    <a class="carousel-control-next" href="#pptViewer" role="button" data-slide="next">
+                      <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                      <span class="sr-only">Next</span>
+                    </a>
+                  </div>
+                  <h3> MESSAGES ON THIS SLIDE</h3>
+                  <textarea id="ppt" rows=10 cols=70></textarea>
+                    <h3>ENTER MESSAGE FOR THIS SLIDE HERE: </h3>
+                    <textarea id="pptind" rows=5 cols=50></textarea>
+                    <button type="button" class="btn" id="chat_slide">SEND</button>
+            </div>
+        </div>
+        <h3>GLOBAL CHAT ROOM</h3>
+        <textarea rows=10 cols=50 id="global"></textarea><br>
+        <h3>ENTER MESSAGE:</h3>
+        <textarea rows=5 cols=50 id="individual"></textarea>
+        <button type="button" class="btn" id="globalChat">SEND</button>
+    </div>
+<script>
+    $(function(){
+
+    var socket = io();
+        var id,name;
+        socket.on('welcome', function(socketId) {
+
+            name = prompt("Nick Name : ");           
+           socket.emit("user_onboard",{"name" : name});
+
+        }); 
+        socket.on("user_onboard",function(obj){
+            id=obj.id;
+            document.getElementById("global").value=obj.msg;
+        })
+        socket.on("refresh_users", function(users)
+        {
+            var jqUsers = $("#users");
+            jqUsers.empty();
+            users.forEach(element => {
+                jqUsers.append("<li id='" + element.id + "' class='list-group-item'>"+ element.name+"</li>");
+                jqUsers.append("<textarea rows=10 cols=100 id=chat"+ element.id +" class='form-control'>" + "</textarea>");
+            });
+            
+         
+        });
+
+
+        $("#chat_slide").on('click',function(){
+            var msg=document.getElementById("pptind").value;
+            msg=name+": "+msg;
+            var currentIndex = $('div.active').index();
+            socket.emit("chat_ppt",{index: currentIndex, msg: msg});
+        });
+        socket.on("chat_ppt",function(obj){
+            var index=obj.index;
+            console.log(index);
+            document.getElementById("p"+index).innerHTML+=obj.msg;
+            document.getElementById("ppt").value+=obj.msg;
+
+        });
+        socket.on("slide_update", function (index) {
+            $('#pptViewer').carousel(index);
+            console.log(index);
+            document.getElementById("pptind").value="";
+            document.getElementById("ppt").value="";
+            var chat=document.getElementById("p"+index).innerHTML;
+            document.getElementById("ppt").value=chat;
+
+        });
+
+        $('#pptViewer').bind('slid', function () {
+           var currentIndex = $('div.active').index();
+           console.log("slide update");
+           document.getElementById("pptind").value="";
+            document.getElementById("ppt").value="";
+           socket.emit("slide_update", currentIndex);
+        });
+
+
+        socket.on("global_chat",function(obj){
+            document.getElementById("global").value+="\n"+obj.msg;
+        });
+
+        $("#globalChat").on('click',function(){
+
+            var msg=document.getElementById('individual').value;
+            msg=name+": "+msg;
+            socket.emit("global_chat",{msg: msg});
+        });
+        
+        $("#users").on('click',".list-group-item", function(){
+         var chat_msg = prompt('Chat Message : ');
+         document.getElementById("chat"+$(this)[0].id).innerHTML+=""+chat_msg;
+          socket.emit("chat_msg", {to : $(this)[0].id, msg:chat_msg, from: id});
+        });
+
+        socket.on("chat_msg", function(chatObj)
+        {
+            console.log("hey");
+            
+           document.getElementById("chat"+chatObj.fid).innerHTML+="\n"+chatObj.from+" : "+chatObj.msg;
+
+
+        });
+    
+
+    });
+</script>
+</body>
+
+</html>
